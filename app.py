@@ -2,9 +2,19 @@ from functions import *
 # from secret import *
 # use_proxy(on=True)
 
-################# CONFIG APP
+ ################# CONFIG APP
 st.set_page_config(page_title='Chantiers 3M', page_icon=None, layout="wide", initial_sidebar_state="auto", menu_items=None)
 
+################## CONFIG MENU
+with st.sidebar:
+    selected = option_menu(
+        menu_title="Main Menu",
+        options=['Home','Data Controller','History Analysis','Analysis'],
+        default_index=1
+
+    )
+
+################# LOAD AND PREPARE DATASETS
 # load data
 data = load_chantiers()
 
@@ -14,38 +24,42 @@ gdf = format_dataset(data)
 # get dataset fixed
 gdf_fix = get_fix_data(gdf)
 
-# get indicators
-indicators = get_indicators(gdf_fix)
 
+#################################
+###### PAGE DATA CONTROLLER #####
+#################################
 
+if selected == 'Data Controller':
 
-################# SESSION STATE
-if 'summarize_controllers' not in st.session_state:
-    st.session_state['summarize_controllers'] = get_controllers(gdf_fix)
+    # get controllers
+    controllers = get_controllers(gdf)
 
+    ###### CONTENERS ###########
+    st.write('# Contrôle données')
+    st.markdown("---")
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Ouverts / Terminés", value=controllers.loc['open_expired'])
+    with col2:
+        st.metric("En instruction / Terminés", value=controllers.loc['instruction_expired'])
+    with col3:
+        st.metric("En instruction / En cours", value=controllers.loc['instruction_current'])
+    with col4:
+        st.metric("Période négative", value=controllers.loc['negative_period'])
 
-###### SIDEBAR CONTROLE DATA ########
-def display_callback():
-    if st.session_state['toggle_k'] == True:
-        st.session_state['summarize_controllers'] = get_controllers(gdf_fix)
-    else :
-        st.session_state['summarize_controllers'] = get_controllers(gdf)
+if selected == 'Analysis':
 
-st.sidebar.write('# Contrôle données')
-st.sidebar.write(st.session_state['summarize_controllers'])
+    ###################################
+    ####### PAGE ANALYSIS   ###########
+    ###################################
 
-fix_data_toggle = st.sidebar.toggle(label='Données corrigées', on_change=display_callback, key='toggle_k',value=True)
+    indicators = get_indicators(gdf_fix)
 
-###################################
-####### CENTRAL DISPLAY ###########
-###################################
+    ############### TITRE
+    st.markdown("<center><h1>Chantiers sur la métropole de Montpellier</center>",unsafe_allow_html=True)
+    st.divider()
 
-############### TITRE
-st.markdown("<center><h1>Chantiers sur la métropole de Montpellier</center>",unsafe_allow_html=True)
-st.divider()
-
-############### INDICATORS
-if st.session_state['toggle_k'] == True:
+    ############### INDICATORS
     col1,col2,col3,col4 = st.columns(4)
     with col1:
         st.metric('Chantiers ouverts', value=indicators['open'])

@@ -7,6 +7,7 @@ import plotly.express as px
 import requests
 import io
 import os
+from streamlit_option_menu import option_menu
 
 # set variable
 today = pd.to_datetime(date.today()) # set today to datetime64 format
