@@ -9,7 +9,7 @@ st.set_page_config(page_title='Chantiers 3M', page_icon=None, layout="wide", ini
 with st.sidebar:
     selected = option_menu(
         menu_title="Main Menu",
-        options=['Home','Data Controller','History Analysis','Analysis'],
+        options=['Home','Data Controller','History Analysis','Activity'],
         default_index=1
 
     )
@@ -35,7 +35,11 @@ if selected == 'Data Controller':
     controllers = get_controllers(gdf)
 
     ###### CONTENERS ###########
-    st.write('# Contrôle données')
+    col1,col2 = st.columns([0.75,0.25])
+    with col1:
+        st.write('# Suivi de la qualité des données')
+    with col2:
+        st.metric("Chantiers scannés",value=gdf.shape[0])
     st.markdown("---")
     col1, col2, col3, col4 = st.columns(4)
     with col1:
@@ -46,8 +50,10 @@ if selected == 'Data Controller':
         st.metric("En instruction / En cours", value=controllers.loc['instruction_current'])
     with col4:
         st.metric("Période négative", value=controllers.loc['negative_period'])
+    st.markdown("---")
+    st.plotly_chart(controllers_by_pole(gdf),use_container_width=True)
 
-if selected == 'Analysis':
+if selected == 'Activity':
 
     ###################################
     ####### PAGE ANALYSIS   ###########

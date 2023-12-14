@@ -119,6 +119,24 @@ def set_controllers(df):
   
   return controllers
 
+# version 2 : préparation des contrôleurs du dataset
+def add_controllers_in_df(df):
+  df= df.copy()
+  # set today to datetime64 format
+  today = pd.to_datetime(date.today())
+  # controllers list
+  controllers = ['open_expired','instruction_expired','instruction_current','negative_period']
+  # controllers initialization
+  for controller in controllers:
+    df[controller]=0
+  # update controllers
+  df.loc[(df['etape']=='Ouvert') & (df['fin_chanti']<today),controllers[0]]=1
+  df.loc[(~df['etape'].isin(['Ouvert','Fermé','Réfectionné'])) & (df['fin_chanti'] < today), controllers[1]]=1
+  df.loc[(~df['etape'].isin(['Ouvert','Fermé','Réfectionné'])) & (df['debut_chan'] <= today) & (df['fin_chanti'] >= today), controllers[2]]=1
+  df.loc[df['debut_chan']>df['fin_chanti'], controllers[3]]=1
+
+  return df
+
 # calcul des contrôleurs
 def get_controllers(df):
   def summarize_controllers(dic):
@@ -142,6 +160,42 @@ def get_controllers(df):
   get_controllers = format_summarize(summarize)
 
   return get_controllers
+
+# get fig controllers by pole 
+def controllers_by_pole(df):
+
+  def label_controllers(x):
+      if x=='open_expired':
+          return 'Ouverts/Terminés'
+      elif x== 'instruction_expired':
+          return 'En instruction/Terminés'
+      elif x== 'instruction_current':
+          return 'En instruction/Ouverts'
+      elif x== 'negative_period':
+          return 'Période négative'
+      else :
+          return 9999
+      
+  def prepare_data(df):
+      df = add_controllers_in_df(df).iloc[:,-5:].groupby(by='POLE').sum()
+      df = df.stack()
+      df = df.reset_index()
+      df = df.rename(columns={
+          'level_1':'controllers',
+          0:'count'
+      })
+      df['controllers'] = df['controllers'].map(label_controllers)
+      return df
+  
+  def get_bar_plot(df):
+      fig = px.bar(df, x='POLE',y='count',color='controllers',template='plotly',
+      labels={'POLE':'Territoire','count':'Nbre de chantiers', 'controllers': 'Contrôleurs'})
+      return fig
+  
+  df= add_territory_to_gdf(df)
+  data = prepare_data(df)
+  fig = get_bar_plot(data)
+  return fig
 
 # correction du dataset
 def get_fix_data(df,del_history=True):
@@ -198,6 +252,35 @@ def count_point_into_poly(gs_pt,gs_pol,gs_attr):
   val = result.values()
   result_df = pd.DataFrame(val,index=idx,columns=['count'])
   return result_df
+
+# transform gdf polygon to point
+def gdf_poly_to_point(gdf):
+  gdf = gdf.reset_index(drop=True)
+  if gdf.crs == '2154':
+    pass
+  else:
+    gdf = gdf.to_crs('2154')
+  gdf['centroid'] = gdf.centroid
+  gdf = gdf.set_geometry(col='centroid', drop=True)
+  return gdf
+
+# add territory to gdf
+def add_territory_to_gdf(gdf):
+  def load_territory():
+    url_terr = 'https://data.montpellier3m.fr/sites/default/files/ressources/MMM_MMM_PolesZonage.json'
+    territory = get_shape(pd.read_json(url_terr))
+    return territory
+  
+  def join_territory(gdf, territory):
+    gdf = gdf_poly_to_point(gdf)
+    gdf = gdf.to_crs('2154')
+    territory = territory.to_crs('2154')
+    gdf = gdf.sjoin(territory, how='left')
+    return gdf
+  
+  territory = load_territory()
+  gdf = join_territory(gdf=gdf, territory=territory)
+  return gdf
 
 # count chantier by sectors
 def get_chant_by_sectors(chantiers):
