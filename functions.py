@@ -12,6 +12,26 @@ from streamlit_option_menu import option_menu
 # set variable
 today = pd.to_datetime(date.today()) # set today to datetime64 format
 
+def delete_unliving(df):
+  df = df.query("etape not in ['Fermé','Réfectionné']")
+  df.reset_index(drop=True, inplace=True)
+  return df
+
+def delete_living(df):
+  df = df.query("etape in ['Fermé','Réfectionné']")
+  df.reset_index(drop=True, inplace=True)
+  return df
+
+def delete_projet(df):
+    df = df.query("etape not in ['Projet','Projet validé']")
+    df.reset_index(drop=True, inplace=True)
+    return df
+
+def select_in_activity(df):
+  df = df.query("etape in ['AC délivré','Ouvert','Autorisé']")
+  df.reset_index(drop=True, inplace=True)
+  return df
+
 # chargement de la donnée brute en json
 @st.cache_data
 def load_dataset(data='historic', historic_deleted='living'):
@@ -63,22 +83,18 @@ def load_dataset(data='historic', historic_deleted='living'):
       
     return geometry
   
-  def delete_inactivity(df):
-    df = df.query("etape not in ['Fermé','Réfectionné']")
-    df.reset_index(drop=True, inplace=True)
-    return df
-  
-  def delete_living(df):
-    df = df.query("etape in ['Fermé','Réfectionné']")
-    df.reset_index(drop=True, inplace=True)
-    return df
-  
   # define source of datasets
-  if data == 'current':
+  if data == 'current' or data == 'hybrid':
     source = "chantiers_vivants.geojson"
     gdf = gpd.read_file('chantiers_vivants.geojson')
-    gdf = delete_inactivity(gdf)
-  if data == 'historic':
+    gdf = delete_unliving(gdf)
+    if data =='current':
+      return gdf
+    else :
+      current = delete_projet(gdf)
+      current = current.drop(columns=['objectid','chantier_g']).to_crs('wgs84')
+    
+  if data == 'historic' or data == 'hybrid':
     source = "https://data.montpellier3m.fr/sites/default/files/ressources/MMM_MMM_HistoriqueChantiersLineaire.json"
     # read json dataset
     df = pd.read_json(source)
@@ -87,29 +103,32 @@ def load_dataset(data='historic', historic_deleted='living'):
     print (f"étape create attributes : {df_attr.shape}")
     # create geometry column
     geometry = get_geometry(df)
-    print (f"construct geometry : {geometry.shape}")
     # concat attributes columns with geometry column
     df = pd.concat([df_attr,geometry], axis=1)
-    print (f"étape concat : {df.shape}")
     if historic_deleted == 'living':
       # delete current working site
       df=delete_living(df)
-    if historic_deleted == 'historic':
-      df=delete_inactivity(df)
+    if historic_deleted == 'unliving':
+      df=delete_unliving(df)
     # format columns to datetime
     df = type_columns(df)
     # declare to gdf
     gdf = gpd.GeoDataFrame(df, geometry='geometry', crs='wgs84')
-    print (f"étape construct gdf : {df.shape}")
+    if data == 'historic':
+      return gdf
+    else:
+      historic = gdf
+  if data == 'hybrid':
+    delta = load_dataset_to_control()
+    gdf = pd.concat([current,historic, delta])
 
   return gdf
 
 def load_dataset_to_control():
   current = load_dataset(data='current')
-  history_living = load_dataset(data='historic', historic_deleted='historic')
+  history_living = load_dataset(data='historic', historic_deleted='unliving')
   delta = history_living[~history_living['numero_fic'].isin(current['numero_fic'])]
   return delta
-
 
 # préparation des contrôleurs du dataset
 def set_controllers(df):
@@ -208,7 +227,7 @@ def controllers_by_pole(df):
   return fig
 
 # correction du dataset
-def get_fix_data(df,del_history=True):
+def get_fix_data(df,del_unliving=True):
   df = df.copy()
   # fix control_1
   df.loc[(df['etape']=='Ouvert') & (df['fin_chanti'] < today),'etape'] = 'Fermé'
@@ -223,9 +242,9 @@ def get_fix_data(df,del_history=True):
   s2 = df.query("debut_chan > fin_chanti")['fin_chanti']
   df_result.loc[mask,'debut_chan']=s2
   df_result.loc[mask,'fin_chanti']=s1
-  if del_history :
+  if del_unliving :
     # delete history
-    df_result = delete_history(df_result)
+    df_result = delete_unliving(df_result)
   return df_result
 
 # calcul des indicateurs
@@ -407,9 +426,8 @@ def get_plot_count_chant():
         return fig
     
     # load data
-    df = load_chantiers()
-    # format dataset
-    df = format_dataset(df,del_history=False)
+    historic = load_dataset(data='historic',historic_deleted='living')
+    current = load_dataset(data='current')
     # get dataset fixed
     df = get_fix_data(df,del_history=False)
     chant_mensuel = get_count_mensuel(df)
