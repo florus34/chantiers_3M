@@ -1,6 +1,6 @@
 from functions import *
-# from secret import *
-# use_proxy(on=True)
+from secret import *
+use_proxy(on=True)
 
  ################# CONFIG APP
 st.set_page_config(page_title='Chantiers 3M', page_icon=None, layout="wide", initial_sidebar_state="auto", menu_items=None)
@@ -16,10 +16,7 @@ with st.sidebar:
 
 ################# LOAD AND PREPARE DATASETS
 # load data
-data = load_chantiers()
-
-# format dataset
-gdf = format_dataset(data)
+gdf = load_dataset(data='hybrid', historic_deleted='living')
 
 # get dataset fixed
 gdf_fix = get_fix_data(gdf)
