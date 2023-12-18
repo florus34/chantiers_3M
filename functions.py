@@ -426,10 +426,9 @@ def get_plot_count_chant():
         return fig
     
     # load data
-    historic = load_dataset(data='historic',historic_deleted='living')
-    current = load_dataset(data='current')
+    df = load_dataset(data='hybrid',historic_deleted='living')
     # get dataset fixed
-    df = get_fix_data(df,del_history=False)
+    df = get_fix_data(df,del_unliving=False)
     chant_mensuel = get_count_mensuel(df)
     fig = get_plot_lines(chant_mensuel)
     return fig
