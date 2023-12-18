@@ -14,19 +14,7 @@ today = pd.to_datetime(date.today()) # set today to datetime64 format
 
 # chargement de la donnée brute en json
 @st.cache_data
-def load_chantiers():
-  url = "https://data.montpellier3m.fr/sites/default/files/ressources/MMM_MMM_HistoriqueChantiersLineaire.json"
-  df = pd.read_json(url)
-  return df
-
-def delete_history(df):
-  df = df.query("etape not in ['Fermé','Réfectionné']")
-  df.reset_index(drop=True, inplace=True)
-  return df
-
-# préparation du dataset
-@st.cache_data
-def format_dataset(df,del_history=True):
+def load_dataset(data='historic'):
 
   def get_attributes(df):
     attributes = [dico['properties'] for dico in df['features'].to_list()]
@@ -68,38 +56,50 @@ def format_dataset(df,del_history=True):
           geometry_list.append(Polygon())
 
       return geometry_list
-    
+      
     geom = get_features_geom(df)
     geometry_list = construct_geom(geom)
     geometry = pd.DataFrame(geometry_list,columns=['geometry'])
-    
+      
     return geometry
+  
+  def delete_inactivity(df):
+    df = df.query("etape not in ['Fermé','Réfectionné']")
+    df.reset_index(drop=True, inplace=True)
+    return df
+  
+  def delete_living(df):
+    df = df.query("etape in ['Fermé','Réfectionné']")
+    df.reset_index(drop=True, inplace=True)
+    return df
+  
+  # define source of datasets
+  if data == 'current':
+    source = "chantiers_vivants.geojson"
+    gdf = gpd.read_file('chantiers_vivants.geojson')
+    gdf = delete_inactivity(gdf)
+  if data == 'historic':
+    source = "https://data.montpellier3m.fr/sites/default/files/ressources/MMM_MMM_HistoriqueChantiersLineaire.json"
+    # read json dataset
+    df = pd.read_json(source)
+    # create attributes columns
+    df_attr = get_attributes(df)
+    print (f"étape create attributes : {df_attr.shape}")
+    # create geometry column
+    geometry = get_geometry(df)
+    print (f"construct geometry : {geometry.shape}")
+    # concat attributes columns with geometry column
+    df = pd.concat([df_attr,geometry], axis=1)
+    print (f"étape concat : {df.shape}")
+    # delete current working site
+    df=delete_living(df)
+    # format columns to datetime
+    df = type_columns(df)
+    # declare to gdf
+    gdf = gpd.GeoDataFrame(df, geometry='geometry', crs='wgs84')
+    print (f"étape construct gdf : {df.shape}")
 
-  # create attributes columns
-  df_t = get_attributes(df)
-  print (f"étape create attributes : {df_t.shape}")
-
-  # create geometry column
-  geometry = get_geometry(df)
-  print (f"construct geometry : {geometry.shape}")
-
-  # concat attributes columns with geometry column
-  df_t = pd.concat([df_t,geometry], axis=1)
-  print (f"étape concat : {df_t.shape}")
-
-  # delete history
-  if del_history:
-    df_t = delete_history(df_t)
-    print (f"étape delete history : {df_t.shape}")
-
-  # format columns to datetime
-  df_t = type_columns(df_t)
-
-  # declare to gdf
-  df_t = gpd.GeoDataFrame(df_t, geometry='geometry', crs='wgs84')
-  print (f"étape construct gdf : {df_t.shape}")
-
-  return df_t
+  return gdf
 
 # préparation des contrôleurs du dataset
 def set_controllers(df):
