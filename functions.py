@@ -14,7 +14,7 @@ today = pd.to_datetime(date.today()) # set today to datetime64 format
 
 # chargement de la donnée brute en json
 @st.cache_data
-def load_dataset(data='historic'):
+def load_dataset(data='historic', historic_deleted='living'):
 
   def get_attributes(df):
     attributes = [dico['properties'] for dico in df['features'].to_list()]
@@ -91,8 +91,11 @@ def load_dataset(data='historic'):
     # concat attributes columns with geometry column
     df = pd.concat([df_attr,geometry], axis=1)
     print (f"étape concat : {df.shape}")
-    # delete current working site
-    df=delete_living(df)
+    if historic_deleted == 'living':
+      # delete current working site
+      df=delete_living(df)
+    if historic_deleted == 'historic':
+      df=delete_inactivity(df)
     # format columns to datetime
     df = type_columns(df)
     # declare to gdf
@@ -100,6 +103,13 @@ def load_dataset(data='historic'):
     print (f"étape construct gdf : {df.shape}")
 
   return gdf
+
+def load_dataset_to_control():
+  current = load_dataset(data='current')
+  history_living = load_dataset(data='historic', historic_deleted='historic')
+  delta = history_living[~history_living['numero_fic'].isin(current['numero_fic'])]
+  return delta
+
 
 # préparation des contrôleurs du dataset
 def set_controllers(df):
