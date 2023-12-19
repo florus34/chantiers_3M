@@ -1,6 +1,6 @@
 from functions import *
-from secret import *
-use_proxy(on=True)
+# from secret import *
+# use_proxy(on=True)
 
  ################# CONFIG APP
 st.set_page_config(page_title='Chantiers 3M', page_icon=None, layout="wide", initial_sidebar_state="auto", menu_items=None)
