@@ -44,6 +44,15 @@ def load_dataset(data='historic', historic_deleted='living'):
     df['debut_chan'] = pd.to_datetime(df['debut_chan'])
     df['fin_chanti'] = pd.to_datetime(df['fin_chanti'])
     return df
+  
+  def delete_columns(df):
+    col_to_deleted = ['objectid', 'id_chantie','m_oeuvre','m_executan']
+    for col in col_to_deleted:
+      try:
+          del df[col]
+      except:
+          continue
+    return df
 
   def get_geometry(df):
 
@@ -88,11 +97,13 @@ def load_dataset(data='historic', historic_deleted='living'):
     source = "chantiers_vivants.geojson"
     gdf = gpd.read_file('chantiers_vivants.geojson')
     gdf = delete_unliving(gdf)
+    # delete unused columns
+    gdf = delete_columns(gdf)
     if data =='current':
       return gdf
     else :
       current = delete_projet(gdf)
-      current = current.drop(columns=['objectid','chantier_g']).to_crs('wgs84')
+      current = current.drop(columns=['chantier_g']).to_crs('wgs84')
     
   if data == 'historic' or data == 'hybrid':
     source = "https://data.montpellier3m.fr/sites/default/files/ressources/MMM_MMM_HistoriqueChantiersLineaire.json"
@@ -112,6 +123,8 @@ def load_dataset(data='historic', historic_deleted='living'):
       df=delete_unliving(df)
     # format columns to datetime
     df = type_columns(df)
+    # delete unused columns
+    df = delete_columns(df)
     # declare to gdf
     gdf = gpd.GeoDataFrame(df, geometry='geometry', crs='wgs84')
     if data == 'historic':
@@ -119,12 +132,12 @@ def load_dataset(data='historic', historic_deleted='living'):
     else:
       historic = gdf
   if data == 'hybrid':
-    delta = load_dataset_to_control()
+    delta = get_dataset_to_control()
     gdf = pd.concat([current,historic, delta])
 
   return gdf
 
-def load_dataset_to_control():
+def get_dataset_to_control():
   current = load_dataset(data='current')
   history_living = load_dataset(data='historic', historic_deleted='unliving')
   delta = history_living[~history_living['numero_fic'].isin(current['numero_fic'])]
