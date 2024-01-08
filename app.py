@@ -1,4 +1,6 @@
 from functions import *
+from filter_df import *
+
 # from secret import *
 # use_proxy(on=True)
 
@@ -9,7 +11,7 @@ st.set_page_config(page_title='Chantiers 3M', page_icon=None, layout="wide", ini
 with st.sidebar:
     selected = option_menu(
         menu_title="Main Menu",
-        options=['Home','Data Controller','History Analysis','Activity'],
+        options=['Data Explorer','Data Controller','History Analysis','Activity'],
         default_index=1
 
     )
@@ -21,6 +23,47 @@ gdf = load_dataset(data='hybrid', historic_deleted='living')
 # get dataset fixed
 gdf_fix = get_fix_data(gdf)
 
+#################################
+###### PAGE DATA EXPLORER   #####
+#################################
+
+if selected == 'Data Explorer':
+    data_option = st.selectbox(
+        'Choix du dataset à explorer ?',
+        ('Chantiers cloturés', 'Chantiers vivants', 'Chantiers à analyser'), index=2
+    )
+
+    if data_option == 'Chantiers à analyser':
+        dataset = load_dataset(data='hybrid', historic_deleted='unliving')
+
+    elif data_option == 'Chantiers cloturés':
+        dataset = load_dataset(data='historic', historic_deleted='living')
+
+    elif data_option == 'Chantiers vivants':
+        dataset = load_dataset(data='current', historic_deleted='living')
+    else : dataset = None
+
+    # manage geometry because not display with st.dataframe
+    col_to_keep = dataset.columns[dataset.dtypes !='geometry']
+    dataset = dataset[col_to_keep]
+    # control display of date format 
+    table = st.data_editor(filter_dataframe(dataset),
+                   hide_index=True,
+                   column_config={
+                        "debut_chan": st.column_config.DateColumn(
+                            "Début Chantier",
+                            # min_value=date(1900, 1, 1),
+                            # max_value=date(2005, 1, 1),
+                            format="DD.MM.YYYY",
+                            step=1,
+                        ),
+                        "fin_chanti":st.column_config.DateColumn(
+                            "Fin chantier",
+                            format="DD.MM.YYYY",
+                            step=1
+                        )
+                    },)
+    st.sidebar.metric(label="Total Ligne", value=len(table),delta=len(dataset))
 
 #################################
 ###### PAGE DATA CONTROLLER #####
